@@ -1,0 +1,36 @@
+name: Nightly sales counts
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 03:00 Türkiye (UTC+3)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sales-counts
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Count real orders and abandoned checkouts (read-only on ikas)
+        env:
+          IKAS_STORE: cancevizhurma
+          IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+        run: node build-json.mjs
+      - name: Publish the numbers file
+        run: |
+          git config user.name "canceviz-sales-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add sales-counts.json
+          git commit -m "Update sales counts $(date -u +%Y-%m-%d)" || echo "No changes"
+          git push
